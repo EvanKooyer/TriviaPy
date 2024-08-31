@@ -31,5 +31,16 @@ def get_trivia_questions(num_qs=10, category='general'):
 trivia_questions = get_trivia_questions()
 
 for question in trivia_questions:
-    print(question)
-    print('\n')
+    print('Category: ' + question['category'] + '\n')
+    print('Difficulty: ' + question['difficulty'] + '\n')
+    print(question['question'] + '\n')
+
+    for option in question['options']:
+        print('\t' + option + '\n')
+
+    response = str(input('\n write your response here: '))
+
+    if response.upper() == question['correct_answer'].upper():
+        print('Correct!! \n \n')
+    else:
+        print('WRONG!! \n \n')
