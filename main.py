@@ -28,7 +28,11 @@ def get_trivia_questions(num_qs=10, category='general'):
         yield question_dict
 
 
+'''
 trivia_questions = get_trivia_questions()
+
+num_right = 0
+num_wrong = 0
 
 for question in trivia_questions:
     print('Category: ' + question['category'] + '\n')
@@ -36,11 +40,18 @@ for question in trivia_questions:
     print(question['question'] + '\n')
 
     for option in question['options']:
-        print('\t' + option + '\n')
+        print('\t' + option)
 
     response = str(input('\n write your response here: '))
 
     if response.upper() == question['correct_answer'].upper():
         print('Correct!! \n \n')
+        num_right += 1
     else:
         print('WRONG!! \n \n')
+        num_wrong += 1
+
+print('You got {correct} questions right, and {incorrect} wrong.'.format(
+    correct=num_right, incorrect=num_wrong))
+
+'''
