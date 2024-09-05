@@ -10,6 +10,7 @@ import time
 
 
 class Question(Static):
+    # Question class takes in a question and the current score and shows it on screen
 
     answered = False
     correct = False
@@ -47,7 +48,11 @@ class Question(Static):
             yield Button(option, id=('a_' + str(button_num)))
             button_num += 1
 
-        yield Countdown(id='countdown')
+        # this countdown timer is not quite working well for me, this
+        # is the only way i have gotten it to work so far.
+        cd = Countdown(id='countdown')
+        yield cd
+        cd.start(30)
 
 
 class Game(Screen):
@@ -97,16 +102,6 @@ class MainMenu(App):
         yield Footer()
         yield Button('Start Game', id='start')
 
-
-'''
-        for question in trivia_qs:
-            yield ScrollableContainer(
-                Question(question),
-                id='q_{num}'.format(num=q_num),
-                disabled=True
-            )
-            q_num += 1
-'''
 
 if __name__ == "__main__":
     app = MainMenu()
