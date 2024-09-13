@@ -2,27 +2,52 @@ from textual import on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
 from textual.widgets import Label, Button, Static, Footer, Header
-from textual.containers import ScrollableContainer
-from textual.reactive import reactive
 from textual_countdown import Countdown
 from textual.message import Message
-import main
 import time
+import requests
+import json
+import random
+
+
+# Generator function to pull and parse trivia questions for program use
+def get_trivia_questions(num_qs=10, category='general'):
+    api_response = requests.get(
+        'https://opentdb.com/api.php?amount={q}'.format(q=num_qs)
+    )
+
+    trivia_data = json.loads(api_response.text)
+
+    for question in trivia_data['results']:
+        options = list(question['incorrect_answers'])
+        options.append(question['correct_answer'])
+        random.shuffle(options)
+
+        question_dict = {
+            'category': question['category'],
+            'difficulty': question['difficulty'],
+            'question': question['question'],
+            'options': options,
+            'correct_answer': question['correct_answer']
+        }
+        yield question_dict
 
 
 class GameFinish(Screen):
 
-    def __init__(self, score, correct, incorrect, id):
+    def __init__(self, score, correct, incorrect, id='finish'):
         self.final_score = score
         self.correct_answers = correct
         self.incorrect_answers = incorrect
-        super.__init__(id=id)
+        super().__init__(id=id)
 
-    def __compose__(self) -> ComposeResult:
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Footer()
         yield Label('RESULTS', id='results')
         yield Label('Correct Answers: {correct}'.format(correct=self.correct_answers), id='correct')
         yield Label('Incorrect Answers: {incorrect}'.format(incorrect=self.incorrect_answers), id='incorrect')
-        yield Label('Final Score: {score}'.format(score=self.final_score))
+        yield Label('Final Score: {score}'.format(score=self.final_score), id='finalscore')
         yield Button('Return to Main Menu', id='return')
 
 
@@ -100,7 +125,7 @@ class Game(Screen):
             self.final_score = score
             self.num_correct = correct
             self.num_incorrect = incorrect
-            super.__init__()
+            super().__init__()
 
     def on_question_answered(self, message: Question.Answered) -> None:
         if message.correct is True:
@@ -117,9 +142,8 @@ class Game(Screen):
                        id='q_{num}'.format(num=self.question_ans), current_score=self.score))
         else:
             self.remove_children()
-            self.install_screen(GameFinish(
-                self.score, self.correct, self.incorrect, id='finished'))
-            self.push_screen('finished')
+            self.post_message(self.Finished(
+                self.score, self.correct, self.incorrect))
 
     def compose(self) -> ComposeResult:
 
@@ -128,24 +152,50 @@ class Game(Screen):
         yield Question(next(self.gtqs), id='q_{num}'.format(num=self.question_ans))
 
 
+class OptionScreen(Screen):
+
+    def compose(self) -> ComposeResult:
+        yield Label("Enter the number of settings or choose your desired category", id=title)
+        yield Input('Desired number of Questions: ', id='numqs', type='integer')
+
+
 class MainMenu(App):
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'start':
-            self.install_screen(
-                Game(self.trivia_qs, self.num_qs, id='game'), name='gamescreen')
+            starttime = str(int(time.time()))
+            trivia_qs = get_trivia_questions(self.num_qs)
+            self.install_screen(Game(trivia_qs, self.num_qs, id='game_{id}'.format(
+                id=starttime)), name='gamescreen')
             self.push_screen('gamescreen')
+        elif event.button.id == 'options':
+            pass
+        elif event.button.id == 'quit':
+            self.exit()
+        elif event.button.id == 'return':
+            self.pop_screen()
+            self.uninstall_screen('gamescreen')
+            self.uninstall_screen('finishscreen')
+
+    def on_game_finished(self, message: Game.Finished) -> None:
+        self.install_screen(GameFinish(
+            message.final_score,
+            message.num_correct,
+            message.num_incorrect), name='finishscreen')
+        self.switch_screen('finishscreen')
 
     def compose(self) -> ComposeResult:
 
         self.num_qs = 10
         self.trivia_answered = 0
 
-        self.trivia_qs = main.get_trivia_questions(self.num_qs)
+        # self.trivia_qs = main.get_trivia_questions(self.num_qs)
 
         yield Header()
         yield Footer()
         yield Button('Start Game', id='start')
+        yield Button('Change Game Settings', id='options')
+        yield Button('Quit', id='quit')
 
 
 if __name__ == "__main__":
