@@ -11,9 +11,10 @@ import random
 
 
 # Generator function to pull and parse trivia questions for program use
-def get_trivia_questions(num_qs=10, category='general'):
+def get_trivia_questions(num_qs=10, category=None, session_id=None):
     api_response = requests.get(
-        'https://opentdb.com/api.php?amount={q}'.format(q=num_qs)
+        'https://opentdb.com/api.php?amount={q}&token={token}'.format(
+            q=num_qs, token=session_id)
     )
 
     trivia_data = json.loads(api_response.text)
@@ -31,6 +32,25 @@ def get_trivia_questions(num_qs=10, category='general'):
             'correct_answer': question['correct_answer']
         }
         yield question_dict
+
+
+def get_trivia_categories():
+    api_response = requests.get('https://opentdb.com/api_category.php')
+
+    api_data = json.loads(api_response.text)['trivia_categories']
+    categories = {}
+
+    for category in api_data:
+        categories[category['name']] = category['id']
+
+    return categories
+
+
+def get_api_key():
+    api_response = requests.get(
+        'https://opentdb.com/api_token.php?command=request')
+    key = json.loads(api_response.text)['token']
+    return key
 
 
 class GameFinish(Screen):
@@ -155,7 +175,7 @@ class Game(Screen):
 class OptionScreen(Screen):
 
     def compose(self) -> ComposeResult:
-        yield Label("Enter the number of settings or choose your desired category", id=title)
+        yield Label("Enter the number of settings or choose your desired category", id='title')
         yield Input('Desired number of Questions: ', id='numqs', type='integer')
 
 
@@ -164,7 +184,8 @@ class MainMenu(App):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'start':
             starttime = str(int(time.time()))
-            trivia_qs = get_trivia_questions(self.num_qs)
+            trivia_qs = get_trivia_questions(
+                self.num_qs, session_id=self.api_key)
             self.install_screen(Game(trivia_qs, self.num_qs, id='game_{id}'.format(
                 id=starttime)), name='gamescreen')
             self.push_screen('gamescreen')
@@ -188,8 +209,8 @@ class MainMenu(App):
 
         self.num_qs = 10
         self.trivia_answered = 0
-
-        # self.trivia_qs = main.get_trivia_questions(self.num_qs)
+        self.categories = get_trivia_categories()
+        self.api_key = get_api_key()
 
         yield Header()
         yield Footer()

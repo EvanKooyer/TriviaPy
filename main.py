@@ -28,6 +28,30 @@ def get_trivia_questions(num_qs=10, category='general'):
         yield question_dict
 
 
+def get_trivia_categories():
+    api_response = requests.get('https://opentdb.com/api_category.php')
+
+    api_data = json.loads(api_response.text)['trivia_categories']
+    categories = {}
+
+    for category in api_data:
+        categories[category['name']] = category['id']
+
+    return categories
+
+
+def get_api_key():
+    api_response = requests.get(
+        'https://opentdb.com/api_token.php?command=request')
+    key = json.loads(api_response.text)['token']
+    return key
+
+
+data = get_trivia_categories()
+
+print(get_api_key())
+
+
 '''
 trivia_questions = get_trivia_questions()
 
