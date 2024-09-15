@@ -1,7 +1,7 @@
 from textual import on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
-from textual.widgets import Label, Button, Static, Footer, Header
+from textual.widgets import Label, Button, Static, Footer, Header, Input, OptionList, ListItem, ListView
 from textual_countdown import Countdown
 from textual.message import Message
 import time
@@ -12,10 +12,16 @@ import random
 
 # Generator function to pull and parse trivia questions for program use
 def get_trivia_questions(num_qs=10, category=None, session_id=None):
-    api_response = requests.get(
-        'https://opentdb.com/api.php?amount={q}&token={token}'.format(
-            q=num_qs, token=session_id)
-    )
+    if category is not None:
+        api_response = requests.get(
+            'https://opentdb.com/api.php?amount={q}&category={c}&token={token}'.format(
+                q=num_qs, c=category, token=session_id)
+        )
+    else:
+        api_response = requests.get(
+            'https://opentdb.com/api.php?amount={q}&token={token}'.format(
+                q=num_qs, token=session_id)
+        )
 
     trivia_data = json.loads(api_response.text)
 
@@ -34,6 +40,7 @@ def get_trivia_questions(num_qs=10, category=None, session_id=None):
         yield question_dict
 
 
+# gets a list of categories to choose from
 def get_trivia_categories():
     api_response = requests.get('https://opentdb.com/api_category.php')
 
@@ -112,6 +119,7 @@ class Question(Static):
 
     def compose(self) -> ComposeResult:
         yield Label(self.question['question'], id='question')
+        yield Label('Category: {cat}'.format(cat=self.question['category'], id='category'))
 
         button_num = 1
         self.option_dict = {}
@@ -174,29 +182,65 @@ class Game(Screen):
 
 class OptionScreen(Screen):
 
+    class OptionSelection(Message):
+
+        def __init__(self, category_id, num_qs):
+            self.category_id = category_id
+            self.num_qs = num_qs
+            super().__init__()
+
+    def __init__(self, categories):
+        self.num_qs = 10
+        self.category_id = None
+        self.categories = categories
+        super().__init__()
+
     def compose(self) -> ComposeResult:
-        yield Label("Enter the number of settings or choose your desired category", id='title')
-        yield Input('Desired number of Questions: ', id='numqs', type='integer')
+        yield Label("Enter how many questions you want the trivia to be and press enter:", id='qprompt')
+        yield Input(placeholder='10', type='integer', id='numqs')
+        yield Label("Double click the category you would like to use", id='oprompt')
+        yield OptionList('All Trivia', *list(self.categories.keys()))
+        yield Button('Return to main menu', id='optionreturn')
 
 
 class MainMenu(App):
+
+    def __init__(self):
+        self.num_qs = 10
+        self.category_id = None
+        self.categories = get_trivia_categories()
+        super().__init__()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'start':
             starttime = str(int(time.time()))
             trivia_qs = get_trivia_questions(
-                self.num_qs, session_id=self.api_key)
+                self.num_qs, category=self.category_id, session_id=self.api_key)
             self.install_screen(Game(trivia_qs, self.num_qs, id='game_{id}'.format(
                 id=starttime)), name='gamescreen')
             self.push_screen('gamescreen')
         elif event.button.id == 'options':
-            pass
+            self.push_screen('options')
         elif event.button.id == 'quit':
             self.exit()
+        elif event.button.id == 'optionreturn':
+            self.pop_screen()
         elif event.button.id == 'return':
             self.pop_screen()
             self.uninstall_screen('gamescreen')
             self.uninstall_screen('finishscreen')
+
+    def on_input_submitted(self, event: Input.Changed) -> None:
+        if 0 < int(event.value) <= 50:
+            self.num_qs = int(event.value)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        selection = event.option.prompt
+
+        if selection == 'All Trivia':
+            self.category_id = None
+        else:
+            self.category_id = self.categories[selection]
 
     def on_game_finished(self, message: Game.Finished) -> None:
         self.install_screen(GameFinish(
@@ -205,11 +249,14 @@ class MainMenu(App):
             message.num_incorrect), name='finishscreen')
         self.switch_screen('finishscreen')
 
+    def on_option_entered(self, message: OptionScreen.OptionSelection) -> None:
+        self.num_qs = message.num_qs
+        self.category_id = message.category_id
+
     def compose(self) -> ComposeResult:
 
-        self.num_qs = 10
+        self.install_screen(OptionScreen(self.categories), name='options')
         self.trivia_answered = 0
-        self.categories = get_trivia_categories()
         self.api_key = get_api_key()
 
         yield Header()
